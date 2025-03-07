@@ -24,6 +24,62 @@
 #include "DHT.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ##############  CONFIGURAÇÃO DO WIFI
+const char* ssid = "Lucas Galindo | POCO C65";       // Substitua pelo seu Wi-Fi
+const char* password = "lucras22";  // Substitua pela senha
+
+// ##############  CONFIGURAÇÃO DO TELEGRAM
+const String botToken = "7751526303:AAEjh5i6E2B0uGwTbU3TGWbjhbvcdTEvFdg";  // Substitua pelo token do seu bot
+const String chatId = "7003158288";     // Substitua pelo seu chat ID
+
+WiFiClientSecure client;
+
+// Função para enviar mensagem para o Telegram via POST
+void sendMessage(String message) {
+  WiFi.begin(ssid, password);
+  Serial.print("Conectando ao Wi-Fi");
+  
+  int tentativas = 0;
+  while (WiFi.status() != WL_CONNECTED && tentativas < 10) { // Tenta conectar por no máximo 10 segundos
+    delay(1000);
+    Serial.print(".");
+    tentativas++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi conectado!");
+    HTTPClient http;
+    String url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+    
+    http.begin(url);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    
+    // Montando os parâmetros da requisição POST
+    String postData = "chat_id=" + chatId + "&text=" + message;
+    
+    // Enviando a requisição
+    int httpResponseCode = http.POST(postData);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("Código de resposta: " + String(httpResponseCode));
+      Serial.println("Resposta: " + response);
+    } else {
+      Serial.print("Erro na requisição: ");
+      Serial.println(httpResponseCode);
+    }
+    
+    http.end();
+  } else {
+    Serial.println("\nFalha ao conectar ao Wi-Fi.");
+  }
+
+  WiFi.disconnect(true); // Desconecta e desliga o Wi-Fi
+  Serial.println("Wi-Fi desligado!");
+}
 
 // ##############  PINOS
 #define DHT1PIN 12  //Sensor DHT Interno
@@ -82,6 +138,8 @@ void setup() {
   // Calibração para pH 7 e 10 (faixa básica)
   m_7_10 = (7.0 - 10.0) / (calibracao_ph7 - calibracao_ph10);
   b_7_10 = 10.0 - m_7_10 * calibracao_ph10;
+
+  WiFi.mode(WIFI_OFF); // Garante que o Wi-Fi inicia desligado
 }
 
 void loop() {
@@ -194,6 +252,38 @@ void loop() {
   Serial.print(ph4, 3);
   Serial.print(" V | pH 4: ");
   Serial.println(ph4, 2);
+
+  // Enviar dados para o Telegram
+  String mensagem = "-----Dados do Ar-----\n";
+  mensagem +="Umidade: " + String(humidity1) + " %\t\n";
+  mensagem += "Temperatura: " + String(temperature1) + " °C\n\n";
+
+  mensagem += "-----Tanque 1-----\n";
+  mensagem += "Temperatura Agua 1: " + String(temperatureWalter1) + " °C\n";
+  mensagem += "TDS 1 Valor (PPM): " + String(tdsValue1) + "\n";
+  mensagem += "Condutividade Eletrica 1 (ECC): " + String(condutivy1) + "\n";
+  mensagem += "Tensão medida pH 1: " + String(ph1, 3) + " V | pH 1: " + String(ph1, 2) + "\n\n";
+
+  mensagem += "-----Tanque 2-----\n";
+  mensagem += "Temperatura Agua 2: " + String(temperatureWalter2) + " °C\n";
+  mensagem += "TDS 2 Valor (PPM): " + String(tdsValue2) + "\n";
+  mensagem += "Condutividade Eletrica 2 (ECC): " + String(condutivy2) + "\n";
+  mensagem += "Tensão medida pH 2: " + String(ph2, 3) + " V | pH 2: " + String(ph2, 2) + "\n\n";
+
+  mensagem += "-----Tanque 3-----\n";
+  mensagem += "Temperatura Agua 3: " + String(temperatureWalter3) + " °C\n";
+  mensagem += "TDS 3 Valor (PPM): " + String(tdsValue3) + "\n";
+  mensagem += "Condutividade Eletrica 3 (ECC): " + String(condutivy3) + "\n";
+  mensagem += "Tensão medida pH 3: " + String(ph3, 3) + " V | pH 3: " + String(ph3, 2) + "\n\n";
+
+  mensagem += "-----Tanque 4-----\n";
+  mensagem += "Temperatura Agua 4: " + String(temperatureWalter4) + " °C\n";
+  mensagem += "TDS 4 Valor (PPM): " + String(tdsValue4) + "\n";
+  mensagem += "Condutividade Eletrica 4 (ECC): " + String(condutivy4) + "\n";
+  mensagem += "Tensão medida pH 4: " + String(ph4, 3) + " V | pH 4: " + String(ph4, 2) + "\n";
+
+
+  sendMessage(mensagem);  // Envia para o Telegram
 
   // Repetindo as leituras a cada 5 segundos
   delay(5000);
